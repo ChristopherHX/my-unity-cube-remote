@@ -49,8 +49,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             public void run() {
                 try {
                     String ip = hostTextEdit.getText().toString();
-                    InetAddress raw = InetAddress.getByName(ip);
-                    Socket sock = new Socket(raw, 8904);
+                    int p = ip.lastIndexOf(':');
+                    InetAddress raw = InetAddress.getByName(ip.substring(0, p));
+                    Socket sock = new Socket(raw, Integer.parseInt(ip.substring(p + 1)));
                     OutputStream os = sock.getOutputStream();
                     while(true) {
                         byte[] frame = new byte[4 * 6];
