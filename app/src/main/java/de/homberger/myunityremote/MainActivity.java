@@ -28,8 +28,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float[] accelValues = new float[3];
     private float[] gyroValues = new float[3];
     private float[] magnetValues = new float[3];
-    private float ax, ay, az;
-    private float gx, gy, gz;
     private float vx = 0, vy = 0, vz = 0;
     private float px = 0, py = 0, pz = 0;
     private float[] gravity = new float[3];
@@ -37,8 +35,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float pitch, roll, yaw;
     private long lastUpdate = 0;
     private TextView accelTextView, gyroTextView, velocityTextView, positionTextView, orientationTextView;
-    private static final float ACCEL_THRESHOLD = 0.1f;
-    private static final float STATIONARY_THRESHOLD = 0.02f;
+    private static final float ACCEL_THRESHOLD = 0.01f;
+    private static final float STATIONARY_THRESHOLD = 0.002f;
     private static final float ALPHA = 0.98f;
     private float[] rotationMatrix = new float[9];
     private float[] orientation = new float[3];
@@ -53,9 +51,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
-        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME);
-        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
+        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_UI);
+        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
 
         accelTextView = findViewById(R.id.accelTextView);
         gyroTextView = findViewById(R.id.gyroTextView);
@@ -87,12 +85,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     while (true) {
                         byte[] frame = new byte[4 * 12];
                         int off = 0;
-                        off = writeFloat(frame, off, ax);
-                        off = writeFloat(frame, off, ay);
-                        off = writeFloat(frame, off, az);
-                        off = writeFloat(frame, off, gx);
-                        off = writeFloat(frame, off, gy);
-                        off = writeFloat(frame, off, gz);
+                        off = writeFloat(frame, off, accelValues[0]);
+                        off = writeFloat(frame, off, accelValues[1]);
+                        off = writeFloat(frame, off, accelValues[2]);
+                        off = writeFloat(frame, off, gyroValues[0]);
+                        off = writeFloat(frame, off, gyroValues[1]);
+                        off = writeFloat(frame, off, gyroValues[2]);
                         off = writeFloat(frame, off, vx);
                         off = writeFloat(frame, off, vy);
                         off = writeFloat(frame, off, vz);
@@ -132,43 +130,38 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     linearAcceleration[1] = accelValues[1] - gravity[1];
                     linearAcceleration[2] = accelValues[2] - gravity[2];
 
-                    ax = Math.abs(linearAcceleration[0]) > ACCEL_THRESHOLD ? linearAcceleration[0] : 0;
-                    ay = Math.abs(linearAcceleration[1]) > ACCEL_THRESHOLD ? linearAcceleration[1] : 0;
-                    az = Math.abs(linearAcceleration[2]) > ACCEL_THRESHOLD ? linearAcceleration[2] : 0;
+                    accelValues[0] = Math.abs(linearAcceleration[0]) > ACCEL_THRESHOLD ? linearAcceleration[0] : 0;
+                    accelValues[1] = Math.abs(linearAcceleration[1]) > ACCEL_THRESHOLD ? linearAcceleration[1] : 0;
+                    accelValues[2] = Math.abs(linearAcceleration[2]) > ACCEL_THRESHOLD ? linearAcceleration[2] : 0;
 
                     // Complementary filter to fuse accelerometer and gyroscope data
-                    ax = ALPHA * (ax + gx * dt) + (1 - ALPHA) * linearAcceleration[0];
-                    ay = ALPHA * (ay + gy * dt) + (1 - ALPHA) * linearAcceleration[1];
-                    az = ALPHA * (az + gz * dt) + (1 - ALPHA) * linearAcceleration[2];
+                    accelValues[0] = ALPHA * (accelValues[0] + gyroValues[0] * dt) + (1 - ALPHA) * linearAcceleration[0];
+                    accelValues[1] = ALPHA * (accelValues[1] + gyroValues[1] * dt) + (1 - ALPHA) * linearAcceleration[1];
+                    accelValues[2] = ALPHA * (accelValues[2]+ gyroValues[2] * dt) + (1 - ALPHA) * linearAcceleration[2];
 
                     // Check if the device is stationary
-                    float accelerationMagnitude = (float) Math.sqrt(ax * ax + ay * ay + az * az);
+                    float accelerationMagnitude = (float) Math.sqrt(accelValues[0] * accelValues[0] + accelValues[1] * accelValues[1] + accelValues[2] * accelValues[2]);
                     if (accelerationMagnitude < STATIONARY_THRESHOLD) {
                         vx = 0;
                         vy = 0;
                         vz = 0;
                     } else {
                         // Update velocity by integrating acceleration
-                        vx += ax * dt;
-                        vy += ay * dt;
-                        vz += az * dt;
+                        vx += accelValues[0] * dt;
+                        vy += accelValues[1] * dt;
+                        vz += accelValues[2] * dt;
                     }
 
                     // Update position by integrating velocity
                     px += vx * dt;
                     py += vy * dt;
                     pz += vz * dt;
-
-                    updateAccelTextView();
-                    updateVelocityTextView();
-                    updatePositionTextView();
                     break;
 
                 case Sensor.TYPE_GYROSCOPE:
-                    gx = event.values[0];
-                    gy = event.values[1];
-                    gz = event.values[2];
-                    updateGyroTextView();
+                    gyroValues[0] = event.values[0];
+                    gyroValues[1] = event.values[1];
+                    gyroValues[2] = event.values[2];
                     break;
 
                 case Sensor.TYPE_MAGNETIC_FIELD:
@@ -182,6 +175,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             pitch = (float) Math.toDegrees(orientation[1]);
             roll = (float) Math.toDegrees(orientation[2]);
             yaw = (float) Math.toDegrees(orientation[0]);
+            updateGyroTextView();
+            updateAccelTextView();
+            updateVelocityTextView();
+            updatePositionTextView();
             updateOrientationTextView();
         }
         lastUpdate = currentTime;
@@ -192,11 +189,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void updateAccelTextView() {
-        runOnUiThread(() -> accelTextView.setText(String.format("Accelerometer: x=%.2f, y=%.2f, z=%.2f", ax, ay, az)));
+        runOnUiThread(() -> accelTextView.setText(String.format("Accelerometer: x=%.2f, y=%.2f, z=%.2f", accelValues[0], accelValues[1], accelValues[2])));
     }
 
     private void updateGyroTextView() {
-        runOnUiThread(() -> gyroTextView.setText(String.format("Gyroscope: x=%.2f, y=%.2f, z=%.2f", gx, gy, gz)));
+        runOnUiThread(() -> gyroTextView.setText(String.format("Gyroscope: x=%.2f, y=%.2f, z=%.2f", gyroValues[0], gyroValues[1], gyroValues[2])));
     }
 
     private void updateVelocityTextView() {
@@ -204,7 +201,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void updatePositionTextView() {
-        runOnUiThread(() -> positionTextView.setText(String.format("Position: x=%.2f, y=%.2f, z=%.2f", px, py, pz)));
+        runOnUiThread(() -> positionTextView.setText(String.format("Position: x=%.4f, y=%.4f, z=%.4f", px, py, pz)));
     }
 
     @Override
