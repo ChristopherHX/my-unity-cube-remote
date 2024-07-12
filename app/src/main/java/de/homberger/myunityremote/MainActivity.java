@@ -23,89 +23,45 @@ import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
-    private static final int REQUEST_HIGH_SAMPLING_RATE_SENSORS = 1;
-
     private SensorManager sensorManager;
-    private Sensor accelerometer;
-    private Sensor gyroscope;
-    private Sensor magnetometer;
-
+    private Sensor accelerometer, gyroscope, magnetometer;
+    private float[] accelValues = new float[3];
+    private float[] gyroValues = new float[3];
+    private float[] magnetValues = new float[3];
+    private float ax, ay, az;
+    private float gx, gy, gz;
+    private float vx = 0, vy = 0, vz = 0;
+    private float px = 0, py = 0, pz = 0;
     private float[] gravity = new float[3];
-    private float[] geomagnetic = new float[3];
-    private float[] linear_acceleration = new float[3];
-    private float[] gyroscopeData = new float[3];
+    private float[] linearAcceleration = new float[3];
+    private float pitch, roll, yaw;
+    private long lastUpdate = 0;
+    private TextView accelTextView, gyroTextView, velocityTextView, positionTextView, orientationTextView;
+    private static final float ACCEL_THRESHOLD = 0.1f;
+    private static final float STATIONARY_THRESHOLD = 0.02f;
+    private static final float ALPHA = 0.98f;
     private float[] rotationMatrix = new float[9];
     private float[] orientation = new float[3];
-    private float[] fusedOrientation = new float[3];
-
-    private float[] velocity = new float[3];
-    private float[] position = new float[3];
-    private long timestamp;
-
-    private TextView orientationTextView;
-    private TextView positionTextView;
-
-    private static final String TAG = "MainActivity";
-
-    // Alpha value for low-pass filter
-    private static final float ALPHA = 0.8f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        orientationTextView = findViewById(R.id.orientationTextView);
-        positionTextView = findViewById(R.id.positionTextView);
-
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        if (sensorManager != null) {
-            accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-            magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.HIGH_SAMPLING_RATE_SENSORS}, REQUEST_HIGH_SAMPLING_RATE_SENSORS);
-                } else {
-                    registerSensors();
-                }
-            } else {
-                registerSensors();
-            }
-        } else {
-            Log.e(TAG, "SensorManager not available");
-        }
-    }
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME);
+        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
 
-    private void registerSensors() {
-        if (accelerometer != null) {
-            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
-        } else {
-            Log.e(TAG, "Accelerometer not available");
-        }
-        if (gyroscope != null) {
-            sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
-        } else {
-            Log.e(TAG, "Gyroscope not available");
-        }
-        if (magnetometer != null) {
-            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_FASTEST);
-        } else {
-            Log.e(TAG, "Magnetometer not available");
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_HIGH_SAMPLING_RATE_SENSORS) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                registerSensors();
-            } else {
-                Log.e(TAG, "High sampling rate sensors permission not granted");
-            }
-        }
+        accelTextView = findViewById(R.id.accelTextView);
+        gyroTextView = findViewById(R.id.gyroTextView);
+        velocityTextView = findViewById(R.id.velocityTextView);
+        positionTextView = findViewById(R.id.positionTextView);
+        orientationTextView = findViewById(R.id.orientationTextView);
     }
 
     private static int writeFloat(byte[] frame, int offset, float v) {
@@ -129,20 +85,26 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     Socket sock = new Socket(raw, Integer.parseInt(ip.substring(p + 1)));
                     OutputStream os = sock.getOutputStream();
                     while (true) {
-                        byte[] frame = new byte[4 * 6];
+                        byte[] frame = new byte[4 * 12];
                         int off = 0;
-                        off = writeFloat(frame, off, position[0]);
-                        off = writeFloat(frame, off, position[1]);
-                        off = writeFloat(frame, off, position[2]);
-                        off = writeFloat(frame, off, fusedOrientation[0]);
-                        off = writeFloat(frame, off, fusedOrientation[1]);
-                        off = writeFloat(frame, off, fusedOrientation[2]);
+                        off = writeFloat(frame, off, ax);
+                        off = writeFloat(frame, off, ay);
+                        off = writeFloat(frame, off, az);
+                        off = writeFloat(frame, off, gx);
+                        off = writeFloat(frame, off, gy);
+                        off = writeFloat(frame, off, gz);
+                        off = writeFloat(frame, off, vx);
+                        off = writeFloat(frame, off, vy);
+                        off = writeFloat(frame, off, vz);
+                        off = writeFloat(frame, off, px);
+                        off = writeFloat(frame, off, py);
+                        off = writeFloat(frame, off, pz);
                         os.write(frame);
                         os.flush();
                         Thread.sleep(100);
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Connection failed", e);
+                    return;
                 }
             }
         };
@@ -151,72 +113,101 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        switch (event.sensor.getType()) {
-            case Sensor.TYPE_ACCELEROMETER:
-                // Apply low-pass filter to isolate gravity
-                gravity[0] = ALPHA * gravity[0] + (1 - ALPHA) * event.values[0];
-                gravity[1] = ALPHA * gravity[1] + (1 - ALPHA) * event.values[1];
-                gravity[2] = ALPHA * gravity[2] + (1 - ALPHA) * event.values[2];
+        long currentTime = event.timestamp;
+        if (lastUpdate != 0) {
+            float dt = (currentTime - lastUpdate) * 1.0f / 1000000000.0f; // Convert nanoseconds to seconds
 
-                // Subtract gravity to get linear acceleration
-                linear_acceleration[0] = event.values[0] - gravity[0];
-                linear_acceleration[1] = event.values[1] - gravity[1];
-                linear_acceleration[2] = event.values[2] - gravity[2];
+            switch (event.sensor.getType()) {
+                case Sensor.TYPE_ACCELEROMETER:
+                    System.arraycopy(event.values, 0, accelValues, 0, event.values.length);
 
-                Log.d(TAG, String.format("Accelerometer: X=%.2f Y=%.2f Z=%.2f", linear_acceleration[0], linear_acceleration[1], linear_acceleration[2]));
-                break;
-            case Sensor.TYPE_GYROSCOPE:
-                System.arraycopy(event.values, 0, gyroscopeData, 0, gyroscopeData.length);
-                if (timestamp != 0) {
-                    final float dT = (event.timestamp - timestamp) * 1.0f / 1000000000.0f;
-                    fusedOrientation[0] += gyroscopeData[0] * dT;
-                    fusedOrientation[1] += gyroscopeData[1] * dT;
-                    fusedOrientation[2] += gyroscopeData[2] * dT;
-                }
-                timestamp = event.timestamp;
-                break;
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                System.arraycopy(event.values, 0, geomagnetic, 0, geomagnetic.length);
-                break;
-        }
+                    // Apply low-pass filter to isolate gravity
+                    final float alpha = 0.8f;
+                    gravity[0] = alpha * gravity[0] + (1 - alpha) * accelValues[0];
+                    gravity[1] = alpha * gravity[1] + (1 - alpha) * accelValues[1];
+                    gravity[2] = alpha * gravity[2] + (1 - alpha) * accelValues[2];
 
-        if (gravity != null && geomagnetic != null) {
-            boolean success = SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic);
-            if (success) {
-                SensorManager.getOrientation(rotationMatrix, orientation);
-                fusedOrientation[0] = orientation[0];
-                fusedOrientation[1] = orientation[1];
-                fusedOrientation[2] = orientation[2];
+                    // Remove gravity from the acceleration values
+                    linearAcceleration[0] = accelValues[0] - gravity[0];
+                    linearAcceleration[1] = accelValues[1] - gravity[1];
+                    linearAcceleration[2] = accelValues[2] - gravity[2];
+
+                    ax = Math.abs(linearAcceleration[0]) > ACCEL_THRESHOLD ? linearAcceleration[0] : 0;
+                    ay = Math.abs(linearAcceleration[1]) > ACCEL_THRESHOLD ? linearAcceleration[1] : 0;
+                    az = Math.abs(linearAcceleration[2]) > ACCEL_THRESHOLD ? linearAcceleration[2] : 0;
+
+                    // Complementary filter to fuse accelerometer and gyroscope data
+                    ax = ALPHA * (ax + gx * dt) + (1 - ALPHA) * linearAcceleration[0];
+                    ay = ALPHA * (ay + gy * dt) + (1 - ALPHA) * linearAcceleration[1];
+                    az = ALPHA * (az + gz * dt) + (1 - ALPHA) * linearAcceleration[2];
+
+                    // Check if the device is stationary
+                    float accelerationMagnitude = (float) Math.sqrt(ax * ax + ay * ay + az * az);
+                    if (accelerationMagnitude < STATIONARY_THRESHOLD) {
+                        vx = 0;
+                        vy = 0;
+                        vz = 0;
+                    } else {
+                        // Update velocity by integrating acceleration
+                        vx += ax * dt;
+                        vy += ay * dt;
+                        vz += az * dt;
+                    }
+
+                    // Update position by integrating velocity
+                    px += vx * dt;
+                    py += vy * dt;
+                    pz += vz * dt;
+
+                    updateAccelTextView();
+                    updateVelocityTextView();
+                    updatePositionTextView();
+                    break;
+
+                case Sensor.TYPE_GYROSCOPE:
+                    gx = event.values[0];
+                    gy = event.values[1];
+                    gz = event.values[2];
+                    updateGyroTextView();
+                    break;
+
+                case Sensor.TYPE_MAGNETIC_FIELD:
+                    System.arraycopy(event.values, 0, magnetValues, 0, event.values.length);
+                    break;
             }
+
+            // Update rotation matrix and orientation using accelerometer and magnetometer
+            SensorManager.getRotationMatrix(rotationMatrix, null, accelValues, magnetValues);
+            SensorManager.getOrientation(rotationMatrix, orientation);
+            pitch = (float) Math.toDegrees(orientation[1]);
+            roll = (float) Math.toDegrees(orientation[2]);
+            yaw = (float) Math.toDegrees(orientation[0]);
+            updateOrientationTextView();
         }
+        lastUpdate = currentTime;
+    }
 
-        if (timestamp != 0) {
-            final float dT = (event.timestamp - timestamp) * 1.0f / 1000000000.0f;
+    private void updateOrientationTextView() {
+        runOnUiThread(() -> orientationTextView.setText(String.format("Orientation: pitch=%.2f, roll=%.2f, yaw=%.2f", pitch, roll, yaw)));
+    }
 
-            for (int i = 0; i < 3; i++) {
-                velocity[i] += linear_acceleration[i] * dT;
-                position[i] += velocity[i] * dT;
+    private void updateAccelTextView() {
+        runOnUiThread(() -> accelTextView.setText(String.format("Accelerometer: x=%.2f, y=%.2f, z=%.2f", ax, ay, az)));
+    }
 
-                // Logging for debugging
-                Log.d(TAG, String.format("Axis %d: Accel=%.2f Vel=%.2f Pos=%.2f", i, linear_acceleration[i], velocity[i], position[i]));
-            }
-        }
+    private void updateGyroTextView() {
+        runOnUiThread(() -> gyroTextView.setText(String.format("Gyroscope: x=%.2f, y=%.2f, z=%.2f", gx, gy, gz)));
+    }
 
-        timestamp = event.timestamp;
+    private void updateVelocityTextView() {
+        runOnUiThread(() -> velocityTextView.setText(String.format("Velocity: x=%.4f, y=%.4f, z=%.4f", vx, vy, vz)));
+    }
 
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                orientationTextView.setText(String.format("Orientation: \nX: %.2f\nY: %.2f\nZ: %.2f",
-                        fusedOrientation[0], fusedOrientation[1], fusedOrientation[2]));
-                positionTextView.setText(String.format("Position: \nX: %.2f\nY: %.2f\nZ: %.2f",
-                        position[0], position[1], position[2]));
-            }
-        });
+    private void updatePositionTextView() {
+        runOnUiThread(() -> positionTextView.setText(String.format("Position: x=%.2f, y=%.2f, z=%.2f", px, py, pz)));
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Not used in this example
     }
 }

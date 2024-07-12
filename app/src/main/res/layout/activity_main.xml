@@ -24,6 +24,21 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Orientation: "/>
+    <TextView
+        android:id="@+id/accelTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Orientation: "/>
+    <TextView
+        android:id="@+id/gyroTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Orientation: "/>
+    <TextView
+        android:id="@+id/velocityTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Orientation: "/>
 
     <TextView
         android:id="@+id/positionTextView"
