@@ -43,6 +43,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView textView;
     private float[] angle = new float[3];
     private float[] aAngle = new float[3];
+    private float[] olxyz;
+    private float[] ospeed;
+    private float[] ogyro;
 
 
     @Override
@@ -138,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
 
             float delta = (cur - last) / 1000000000.0f;
-            if(last == 0) {
+            if(last == 0 || delta > 0.1f) {
                 last = cur;
                 return;
             }
@@ -160,6 +163,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
             float gravity = (float) sqrt(x * x + y * y + z * z);
+            float[] lxyz = new float[]{0,0,0};
+            float[] xyz = new float[]{0,0,0};
+
             if(gravity >= 9.80 && gravity < 9.82) {
                 aAngle[0] = (float) atan(y / z);
                 aAngle[1] = (float) -atan(x / z);
@@ -173,6 +179,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 speed[1] = 0;
                 speed[2] = 0;
 
+                olxyz = null;
+                ospeed = null;
+                ogyro = null;
+
             } else {
 
                 //m.setValues(new float[] {  });
@@ -184,37 +194,53 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //                position[0] += 100 * speed[0] * delta;
 //                position[1] += 100 * speed[1] * delta;
 //                position[2] += 100 * speed[2] * delta;
+
+                Matrix rotate = new Matrix();
+                //rotate.preConcat(getRz(0));
+                rotate.preConcat(getRx(-angle[0]));
+                rotate.preConcat(getRy(-angle[1]));
+                float[] in = new float[]{0, 0, 9.81f};
+
+                //rotate.mapVectors(xyz, in);
+                Matrix res = new Matrix();
+                float[] mres = new float[]{0, 0, 0, 0, 0, 0, 9.81f, 0, 0};
+                res.setValues(mres);
+                res.postConcat(rotate);
+                res.getValues(mres);
+                xyz[0] = mres[0];
+                xyz[1] = mres[3];
+                xyz[2] = mres[6];
+                lxyz[0] = x - mres[0];
+                lxyz[1] = y - mres[3];
+                lxyz[2] = z - mres[6];
+                if(olxyz != null) {
+                    float pass = 0.9f;
+                    lxyz[0] = lxyz[0] * pass + (1 - pass) * olxyz[0];
+                    lxyz[1] = lxyz[1] * pass + (1 - pass) * olxyz[1];
+                    lxyz[2] = lxyz[2] * pass + (1 - pass) * olxyz[2];
+
+                }
+                olxyz = lxyz;
+
+//                if(Math.sqrt(lxyz[0] * lxyz[0] + lxyz[1] * lxyz[1] + lxyz[2] * lxyz[2]) > 0.1) {
+                    speed[0] += lxyz[0] * delta;
+                    speed[1] += lxyz[1] * delta;
+                    speed[2] += lxyz[2] * delta;
+//                }
+                if(ospeed != null) {
+                    float pass = 0.9f;
+                    speed[0] = speed[0] * pass + (1 - pass) * ospeed[0];
+                    speed[1] = speed[1] * pass + (1 - pass) * ospeed[1];
+                    speed[2] = speed[2] * pass + (1 - pass) * ospeed[2];
+                }
+                ospeed = speed;
+
+//                if(Math.sqrt(speed[0] * speed[0] + speed[1] * speed[1] + speed[2] * speed[2]) > 0.1) {
+                    position[0] += 100 * speed[0] * delta;
+                    position[1] += 100 * speed[1] * delta;
+                    position[2] += 100 * speed[2] * delta;
+//                }
             }
-
-            Matrix rotate = new Matrix();
-            //rotate.preConcat(getRz(0));
-            rotate.preConcat(getRx(-angle[0]));
-            rotate.preConcat(getRy(-angle[1]));
-            float[] in = new float[]{0, 0, 9.81f};
-            float[] xyz = new float[]{0,0,0};
-
-            //rotate.mapVectors(xyz, in);
-            Matrix res = new Matrix();
-            float[] mres = new float[]{0, 0, 0, 0, 0, 0, 9.81f, 0, 0};
-            res.setValues(mres);
-            res.postConcat(rotate);
-            res.getValues(mres);
-            xyz[0] = mres[0];
-            xyz[1] = mres[3];
-            xyz[2] = mres[6];
-            float[] lxyz = new float[]{0,0,0};
-            lxyz[0] = x - mres[0];
-            lxyz[1] = y - mres[3];
-            lxyz[2] = z - mres[6];
-
-            speed[0] += lxyz[0] * delta;
-            speed[1] += lxyz[1] * delta;
-            speed[2] += lxyz[2] * delta;
-
-            position[0] += 100 * speed[0] * delta;
-            position[1] += 100 * speed[1] * delta;
-            position[2] += 100 * speed[2] * delta;
-
 
             textView.setText("delta: " + delta + "\naccel:\n" + Arrays.toString(sensorEvent.values).replace(", ", ", \n" ) + "\naccel rot:\n" + Arrays.toString(xyz).replace(", ", ", \n" ) +"\naccel lin:\n" + Arrays.toString(lxyz).replace(", ", ", \n" ) + "\nspeed: \n" + Arrays.toString(speed).replace(", ", ",\n" ) + "\nposition: \n" + Arrays.toString(position).replace(", ", ",\n") + "\ngx: " + gx + "\ngy: " + gy + "\ngz: " + gz + "\nangle:\n" + Arrays.toString(angle).replace(", ", ", \n" ) + "\naAngle:\n" + Arrays.toString(aAngle).replace(", ", ", \n" ));
             //Matrix proc = new Matrix();
@@ -226,11 +252,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             gz = sensorEvent.values[2];
             double delta = (cur - glast) / 1000000000.0f;
 
-            if(glast == 0) {
+            if(glast == 0 || ogyro == null) {
                 glast = cur;
+                ogyro = sensorEvent.values.clone();
                 return;
             }
             glast = cur;
+
+            if(ogyro != null) {
+                float pass = 0.9f;
+                sensorEvent.values[0] = sensorEvent.values[0] * pass + (1 - pass) * ogyro[0];
+                sensorEvent.values[1] = sensorEvent.values[1] * pass + (1 - pass) * ogyro[1];
+                sensorEvent.values[2] = sensorEvent.values[2] * pass + (1 - pass) * ogyro[2];
+            }
+            ogyro = sensorEvent.values.clone();
 
             angle[0] += gx * delta;
             angle[1] += gy * delta;
