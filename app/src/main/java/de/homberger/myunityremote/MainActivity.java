@@ -17,51 +17,48 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.util.Log;
 
+import com.kircherelectronics.fsensor.observer.SensorSubject;
+import com.kircherelectronics.fsensor.sensor.FSensor;
+import com.kircherelectronics.fsensor.sensor.acceleration.AccelerationSensor;
+
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
-
-    private SensorManager sensorManager;
-    private Sensor accelerometer, gyroscope, magnetometer;
-    private float[] accelValues = new float[3];
-    private float[] gyroValues = new float[3];
-    private float[] magnetValues = new float[3];
-    private float vx = 0, vy = 0, vz = 0;
-    private float px = 0, py = 0, pz = 0;
-    private float[] gravity = new float[3];
-    private float[] linearAcceleration = new float[3];
-    private float pitch, roll, yaw;
-    private long lastUpdate = 0;
+public class MainActivity extends AppCompatActivity {
     private TextView accelTextView, gyroTextView, velocityTextView, positionTextView, orientationTextView;
-    private static final float ACCEL_THRESHOLD = 0.01f;
-    private static final float STATIONARY_THRESHOLD = 0.002f;
-    private static final float ALPHA = 0.98f;
-    private float[] rotationMatrix = new float[9];
-    private float[] orientation = new float[3];
+
+    private FSensor testSensor;
+    private float[] accelValues = new float[3];
+    private SensorSubject.SensorObserver testObserver = new SensorSubject.SensorObserver() {
+        @Override
+        public void onSensorChanged(float[] values) {
+            System.arraycopy(values, 0, accelValues, 0, accelValues.length);
+            updateOrientationTextView();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI);
-        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_UI);
-        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI);
-
         accelTextView = findViewById(R.id.accelTextView);
         gyroTextView = findViewById(R.id.gyroTextView);
         velocityTextView = findViewById(R.id.velocityTextView);
         positionTextView = findViewById(R.id.positionTextView);
         orientationTextView = findViewById(R.id.orientationTextView);
-    }
 
+        testSensor = new AccelerationSensor(this);
+        testSensor.register(testObserver);
+        testSensor.start();
+    }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        testSensor.unregister(testObserver);
+        testSensor.stop();
+    }
     private static int writeFloat(byte[] frame, int offset, float v) {
         int iv = Float.floatToIntBits(v);
         frame[offset] = (byte) (iv >> 24);
@@ -85,18 +82,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     while (true) {
                         byte[] frame = new byte[4 * 12];
                         int off = 0;
-                        off = writeFloat(frame, off, accelValues[0]);
-                        off = writeFloat(frame, off, accelValues[1]);
-                        off = writeFloat(frame, off, accelValues[2]);
-                        off = writeFloat(frame, off, gyroValues[0]);
-                        off = writeFloat(frame, off, gyroValues[1]);
-                        off = writeFloat(frame, off, gyroValues[2]);
-                        off = writeFloat(frame, off, vx);
-                        off = writeFloat(frame, off, vy);
-                        off = writeFloat(frame, off, vz);
-                        off = writeFloat(frame, off, px);
-                        off = writeFloat(frame, off, py);
-                        off = writeFloat(frame, off, pz);
                         os.write(frame);
                         os.flush();
                         Thread.sleep(100);
@@ -109,85 +94,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         thread.start();
     }
 
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        long currentTime = event.timestamp;
-        if (lastUpdate != 0) {
-            float dt = (currentTime - lastUpdate) * 1.0f / 1000000000.0f; // Convert nanoseconds to seconds
-
-            switch (event.sensor.getType()) {
-                case Sensor.TYPE_ACCELEROMETER:
-                    System.arraycopy(event.values, 0, accelValues, 0, event.values.length);
-
-                    // Apply low-pass filter to isolate gravity
-                    final float alpha = 0.8f;
-                    gravity[0] = alpha * gravity[0] + (1 - alpha) * accelValues[0];
-                    gravity[1] = alpha * gravity[1] + (1 - alpha) * accelValues[1];
-                    gravity[2] = alpha * gravity[2] + (1 - alpha) * accelValues[2];
-
-                    // Remove gravity from the acceleration values
-                    linearAcceleration[0] = accelValues[0] - gravity[0];
-                    linearAcceleration[1] = accelValues[1] - gravity[1];
-                    linearAcceleration[2] = accelValues[2] - gravity[2];
-
-                    accelValues[0] = Math.abs(linearAcceleration[0]) > ACCEL_THRESHOLD ? linearAcceleration[0] : 0;
-                    accelValues[1] = Math.abs(linearAcceleration[1]) > ACCEL_THRESHOLD ? linearAcceleration[1] : 0;
-                    accelValues[2] = Math.abs(linearAcceleration[2]) > ACCEL_THRESHOLD ? linearAcceleration[2] : 0;
-
-                    // Complementary filter to fuse accelerometer and gyroscope data
-                    accelValues[0] = ALPHA * (accelValues[0] + gyroValues[0] * dt) + (1 - ALPHA) * linearAcceleration[0];
-                    accelValues[1] = ALPHA * (accelValues[1] + gyroValues[1] * dt) + (1 - ALPHA) * linearAcceleration[1];
-                    accelValues[2] = ALPHA * (accelValues[2]+ gyroValues[2] * dt) + (1 - ALPHA) * linearAcceleration[2];
-
-                    // Check if the device is stationary
-                    float accelerationMagnitude = (float) Math.sqrt(accelValues[0] * accelValues[0] + accelValues[1] * accelValues[1] + accelValues[2] * accelValues[2]);
-                    if (accelerationMagnitude < STATIONARY_THRESHOLD) {
-                        vx = 0;
-                        vy = 0;
-                        vz = 0;
-                    } else {
-                        // Update velocity by integrating acceleration
-                        vx += accelValues[0] * dt;
-                        vy += accelValues[1] * dt;
-                        vz += accelValues[2] * dt;
-                    }
-
-                    // Update position by integrating velocity
-                    px += vx * dt;
-                    py += vy * dt;
-                    pz += vz * dt;
-                    break;
-
-                case Sensor.TYPE_GYROSCOPE:
-                    gyroValues[0] = event.values[0];
-                    gyroValues[1] = event.values[1];
-                    gyroValues[2] = event.values[2];
-                    break;
-
-                case Sensor.TYPE_MAGNETIC_FIELD:
-                    System.arraycopy(event.values, 0, magnetValues, 0, event.values.length);
-                    break;
-            }
-
-            // Update rotation matrix and orientation using accelerometer and magnetometer
-            SensorManager.getRotationMatrix(rotationMatrix, null, accelValues, magnetValues);
-            SensorManager.getOrientation(rotationMatrix, orientation);
-            pitch = (float) Math.toDegrees(orientation[1]);
-            roll = (float) Math.toDegrees(orientation[2]);
-            yaw = (float) Math.toDegrees(orientation[0]);
-            updateGyroTextView();
-            updateAccelTextView();
-            updateVelocityTextView();
-            updatePositionTextView();
-            updateOrientationTextView();
-        }
-        lastUpdate = currentTime;
-    }
-
     private void updateOrientationTextView() {
-        runOnUiThread(() -> orientationTextView.setText(String.format("Orientation: pitch=%.2f, roll=%.2f, yaw=%.2f", pitch, roll, yaw)));
+        runOnUiThread(() -> orientationTextView.setText(String.format("Accl: x=%.2f, y=%.2f, z=%.2f", accelValues[0], accelValues[1], accelValues[2])));
     }
-
+    /*
     private void updateAccelTextView() {
         runOnUiThread(() -> accelTextView.setText(String.format("Accelerometer: x=%.2f, y=%.2f, z=%.2f", accelValues[0], accelValues[1], accelValues[2])));
     }
@@ -203,8 +113,5 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private void updatePositionTextView() {
         runOnUiThread(() -> positionTextView.setText(String.format("Position: x=%.4f, y=%.4f, z=%.4f", px, py, pz)));
     }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-    }
+    */
 }
