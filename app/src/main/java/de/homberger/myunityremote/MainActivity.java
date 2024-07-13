@@ -80,6 +80,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         angle[0] = 0;
         angle[1] = 0;
         angle[2] = 0;
+
+        olxyz = null;
+        ospeed = null;
+        ogyro = null;
     }
     public void onConnect(View view) {
         EditText hostTextEdit = findViewById(R.id.hostTextEdit);
@@ -101,9 +105,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         off = writeFloat(frame, off, gx);
                         off = writeFloat(frame, off, gy);
                         off = writeFloat(frame, off, gz);
-                        off = writeFloat(frame, off, gx);
-                        off = writeFloat(frame, off, gy);
-                        off = writeFloat(frame, off, gz);
+                        off = writeFloat(frame, off, position[0]);
+                        off = writeFloat(frame, off, position[1]);
+                        off = writeFloat(frame, off, position[2]);
                         os.write(frame);
                         os.flush();
 //                        Thread.sleep(100);
