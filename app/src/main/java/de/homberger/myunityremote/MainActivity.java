@@ -23,6 +23,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private SensorManager sensorManager;
     private float x, y, z;
     private float gx, gy, gz;
+    private float mx, my, mz;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager=(SensorManager) getSystemService(SENSOR_SERVICE);
         sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     private static int writeFloat(byte[] frame, int offset, float v) {
@@ -54,7 +56,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     Socket sock = new Socket(raw, Integer.parseInt(ip.substring(p + 1)));
                     OutputStream os = sock.getOutputStream();
                     while(true) {
-                        byte[] frame = new byte[4 * 6];
+                        byte[] frame = new byte[4 * 9];
                         int off = 0;
                         off = writeFloat(frame, off, x);
                         off = writeFloat(frame, off, y);
@@ -62,6 +64,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         off = writeFloat(frame, off, gx);
                         off = writeFloat(frame, off, gy);
                         off = writeFloat(frame, off, gz);
+                        off = writeFloat(frame, off, mx);
+                        off = writeFloat(frame, off, my);
+                        off = writeFloat(frame, off, mz);
                         os.write(frame);
                         os.flush();
                         Thread.sleep(100);
@@ -73,7 +78,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         };
         thread.start();
     }
-
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         if(sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -85,6 +89,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             gx = sensorEvent.values[0];
             gy = sensorEvent.values[1];
             gz = sensorEvent.values[2];
+        }
+        if(sensorEvent.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD){
+            mx = sensorEvent.values[0];
+            my = sensorEvent.values[1];
+            mz = sensorEvent.values[2];
         }
     }
 
