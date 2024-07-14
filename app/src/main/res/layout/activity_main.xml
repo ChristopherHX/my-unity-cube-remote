@@ -68,4 +68,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/switch1"
         tools:checked="true" />
+
+    <Switch
+        android:id="@+id/switch3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:checked="false"
+        android:onClick="onAutoAdjustAngleChanged"
+        android:text="adjust angle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/switch2"
+        tools:checked="false" />
 </androidx.constraintlayout.widget.ConstraintLayout>
