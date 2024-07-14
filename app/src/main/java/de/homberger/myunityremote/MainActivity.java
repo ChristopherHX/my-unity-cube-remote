@@ -277,9 +277,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             //android.opengl.Matrix.multiplyMM();
         }
         if(sensorEvent.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-            gx = sensorEvent.values[0];
-            gy = sensorEvent.values[1];
-            gz = sensorEvent.values[2];
             double delta = (cur - glast) / 1000000000.0f;
 
             if(glast == 0 || ogyro == null) {
@@ -295,6 +292,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 sensorEvent.values[1] = sensorEvent.values[1] * pass + (1 - pass) * ogyro[1];
                 sensorEvent.values[2] = sensorEvent.values[2] * pass + (1 - pass) * ogyro[2];
             }
+            gx = sensorEvent.values[0];
+            gy = sensorEvent.values[1];
+            gz = sensorEvent.values[2];
             ogyro = sensorEvent.values.clone();
 
             angle[0] += gx * delta;
