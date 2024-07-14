@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float[] olxyz;
     private float[] ovelocity;
     private float[] ogyro;
-    private boolean sendPos = true, sendAngle = true, autoAdjustAngle = false;
+    private boolean sendPos = true, sendAngle = true, autoAdjustAngle = false, writeCSV = false;
     private File csv;
     private OutputStreamWriter outputStreamWriter;
 
@@ -98,6 +98,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void onAutoAdjustAngleChanged(View view) {
         autoAdjustAngle = ((Switch)view).isChecked();
+    }
+
+    public void onWriteCSVChanged(View view) {
+        writeCSV = ((Switch)view).isChecked();
     }
 
     // Allow to reset the integrated values
@@ -282,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 textView.setText("delta: " + delta + "\naccel:\n" + Arrays.toString(sensorEvent.values).replace(", ", ", \n") + "\naccel rot:\n" + Arrays.toString(xyz).replace(", ", ", \n") + "\naccel lin:\n" + Arrays.toString(lxyz).replace(", ", ", \n") + "\nvelocity: \n" + Arrays.toString(velocity).replace(", ", ",\n") + "\nposition: \n" + Arrays.toString(position).replace(", ", ",\n") + "\ngx: " + gx + "\ngy: " + gy + "\ngz: " + gz + "\nangle:\n" + Arrays.toString(angle).replace(", ", ", \n") + "\naAngle:\n" + Arrays.toString(aAngle).replace(", ", ", \n"));
             });
             // Capture all data in a csv for analysis
-            if(outputStreamWriter != null) {
+            if(writeCSV && outputStreamWriter != null) {
                 try {
                     outputStreamWriter.write(String.format("%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;%.15f;\n", delta, sensorEvent.values[0], sensorEvent.values[1], sensorEvent.values[2], velocity[0], velocity[1], velocity[2], position[0], position[1], position[2], aAngle[0], aAngle[1], aAngle[2], gx, gy, gz, angle[0], angle[1], angle[2], xyz[0], xyz[1], xyz[2], lxyz[0], lxyz[1], lxyz[2]));
                 } catch (IOException e) {
