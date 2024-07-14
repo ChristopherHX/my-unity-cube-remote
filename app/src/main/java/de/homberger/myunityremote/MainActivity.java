@@ -216,6 +216,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             // Smartphone is almost stationary
             // Calculate the same angle as integrated by the gyro sensor
             if(gravity >= 9.80 && gravity < 9.82) {
+                // Reference https://www.nxp.com/docs/en/application-note/AN3461.pdf
+                // The technical singularity of z == 0 should be handled here
+                // The precision is discussed in the reference
                 aAngle[0] = (float) atan(y / z);
                 aAngle[1] = (float) -atan(x / z);
                 aAngle[2] = 0;
