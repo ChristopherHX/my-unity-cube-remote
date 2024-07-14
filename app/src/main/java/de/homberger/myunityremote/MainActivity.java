@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.io.IOException;
@@ -46,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float[] olxyz;
     private float[] ospeed;
     private float[] ogyro;
+    private boolean sendPos = true, sendAngle = true;
 
 
     @Override
@@ -69,6 +71,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         frame[offset + 3] = (byte) (iv);
         return offset + 4;
     }
+
+    public void onPosChanged(View view) {
+        sendPos = ((Switch)view).isChecked();
+    }
+
+    public void onAngleChanged(View view) {
+        sendAngle = ((Switch)view).isChecked();
+    }
+
     public void reset(View view) {
         speed[0] = 0;
         speed[1] = 0;
@@ -105,9 +116,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         off = writeFloat(frame, off, gx);
                         off = writeFloat(frame, off, gy);
                         off = writeFloat(frame, off, gz);
-                        off = writeFloat(frame, off, position[0]);
-                        off = writeFloat(frame, off, position[1]);
-                        off = writeFloat(frame, off, position[2]);
+                        if(sendPos) {
+                            off = writeFloat(frame, off, position[0]);
+                            off = writeFloat(frame, off, position[1]);
+                            off = writeFloat(frame, off, position[2]);
+                        } else {
+                            off = writeFloat(frame, off, 0);
+                            off = writeFloat(frame, off, 0);
+                            off = writeFloat(frame, off, 0);
+                        }
+                        if(sendAngle) {
+                            off = writeFloat(frame, off, angle[0]);
+                            off = writeFloat(frame, off, angle[1]);
+                            off = writeFloat(frame, off, angle[2]);
+                        } else {
+                            off = writeFloat(frame, off, 0);
+                            off = writeFloat(frame, off, 0);
+                            off = writeFloat(frame, off, 0);
+                        }
                         os.write(frame);
                         os.flush();
 //                        Thread.sleep(100);
