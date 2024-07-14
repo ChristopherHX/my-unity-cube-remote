@@ -1,8 +1,12 @@
 package de.homberger.myunityremote;
 
+import static java.lang.Math.abs;
 import static java.lang.Math.acos;
 import static java.lang.Math.atan;
+import static java.lang.Math.copySign;
 import static java.lang.Math.cos;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 import static java.lang.Math.sin;
 import static java.lang.Math.sqrt;
 
@@ -217,6 +221,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 lxyz[0] = x - mres[0];
                 lxyz[1] = y - mres[3];
                 lxyz[2] = z - mres[6];
+                if(abs(lxyz[0]) < 0.2f) {
+//                    lxyz[0] = 0;
+                    lxyz[0] /= 64;
+                }
+                if(abs(lxyz[1]) < 0.2f) {
+                    lxyz[1] /= 64;
+                }
+                if(abs(lxyz[2]) < 0.2f) {
+                    lxyz[2] /= 64;
+                }
                 if(olxyz != null) {
                     float pass = 0.9f;
                     lxyz[0] = lxyz[0] * pass + (1 - pass) * olxyz[0];
@@ -224,6 +238,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     lxyz[2] = lxyz[2] * pass + (1 - pass) * olxyz[2];
 
                 }
+                lxyz[0] = copySign(min(abs(lxyz[0]), 2), lxyz[0]);
+                lxyz[1] = copySign(min(abs(lxyz[1]), 2), lxyz[1]);
+                lxyz[2] = copySign(min(abs(lxyz[2]), 2), lxyz[2]);
                 olxyz = lxyz;
 
 //                if(Math.sqrt(lxyz[0] * lxyz[0] + lxyz[1] * lxyz[1] + lxyz[2] * lxyz[2]) > 0.1) {
@@ -237,6 +254,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     speed[1] = speed[1] * pass + (1 - pass) * ospeed[1];
                     speed[2] = speed[2] * pass + (1 - pass) * ospeed[2];
                 }
+
+                speed[0] = copySign(min(abs(speed[0]), 10), speed[0]);
+                speed[1] = copySign(min(abs(speed[1]), 10), speed[1]);
+                speed[2] = copySign(min(abs(speed[2]), 10), speed[2]);
+
                 ospeed = speed;
 
 //                if(Math.sqrt(speed[0] * speed[0] + speed[1] * speed[1] + speed[2] * speed[2]) > 0.1) {
