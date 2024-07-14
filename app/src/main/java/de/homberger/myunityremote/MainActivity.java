@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     Socket sock = new Socket(raw, Integer.parseInt(ip.substring(p + 1)));
                     OutputStream os = sock.getOutputStream();
                     while(true) {
-                        byte[] frame = new byte[4 * 9];
+                        byte[] frame = new byte[4 * 12];
                         int off = 0;
                         off = writeFloat(frame, off, x);
                         off = writeFloat(frame, off, y);
